@@ -127,6 +127,80 @@ class GushSecurityIntegrationHub {
     }
 
     /**
+     * Updates an existing connector's endpoint URL with audit log tracking.
+     */
+    fun updateConnectorEndpoint(
+        connectorId: String,
+        newEndpointUrl: String,
+        actor: String = "ADMIN",
+        reason: String = "Routine maintenance"
+    ): Boolean {
+        val current = _connectors.value.find { it.connectorId == connectorId } ?: return false
+        val oldUrl = current.endpointUrl
+        _connectors.value = _connectors.value.map {
+            if (it.connectorId == connectorId) it.copy(endpointUrl = newEndpointUrl) else it
+        }
+        eventBus.publishEvent(
+            GushSecurityEvent(
+                eventType = "connector.endpoint_switched",
+                estateId = "pinnock_estate_01",
+                actorId = actor,
+                actorRole = "ADMIN_SUPERVISOR",
+                description = "Switched endpoint for [${current.name}] from $oldUrl to $newEndpointUrl. Reason: $reason",
+                payload = mapOf(
+                    "connector_id" to connectorId,
+                    "old_url" to oldUrl,
+                    "new_url" to newEndpointUrl,
+                    "reason" to reason
+                )
+            )
+        )
+        return true
+    }
+
+    /**
+     * Rotates credentials for a connector.
+     */
+    fun rotateConnectorCredentials(connectorId: String, actor: String = "ADMIN"): String {
+        val current = _connectors.value.find { it.connectorId == connectorId } ?: return "Connector not found"
+        val newKey = "gush_live_" + UUID.randomUUID().toString().replace("-", "").take(24)
+        val newSecret = "sec_" + UUID.randomUUID().toString().replace("-", "")
+        _connectors.value = _connectors.value.map {
+            if (it.connectorId == connectorId) it.copy(apiKey = newKey, apiSecret = newSecret) else it
+        }
+        eventBus.publishEvent(
+            GushSecurityEvent(
+                eventType = "connector.credentials_rotated",
+                estateId = "pinnock_estate_01",
+                actorId = actor,
+                actorRole = "ADMIN_SUPERVISOR",
+                description = "Rotated API key & HMAC secret for [${current.name}].",
+                payload = mapOf("connector_id" to connectorId, "key_prefix" to newKey.take(12) + "...")
+            )
+        )
+        return newKey
+    }
+
+    /**
+     * Removes a connector from the registry.
+     */
+    fun deleteConnector(connectorId: String, actor: String = "ADMIN"): Boolean {
+        val current = _connectors.value.find { it.connectorId == connectorId } ?: return false
+        _connectors.value = _connectors.value.filter { it.connectorId != connectorId }
+        eventBus.publishEvent(
+            GushSecurityEvent(
+                eventType = "connector.deleted",
+                estateId = "pinnock_estate_01",
+                actorId = actor,
+                actorRole = "ADMIN_SUPERVISOR",
+                description = "Removed connector [${current.name}] ($connectorId).",
+                payload = mapOf("connector_id" to connectorId, "name" to current.name)
+            )
+        )
+        return true
+    }
+
+    /**
      * Adds a new custom connector.
      */
     fun addConnector(
@@ -174,6 +248,23 @@ class GushSecurityIntegrationHub {
 
     private fun createInitialConnectors(): List<IntegrationConnectorConfig> {
         return listOf(
+            IntegrationConnectorConfig(
+                connectorId = "conn_sstore_prod",
+                name = "SStore Production API Backend (PHP Gateway)",
+                connectionType = ConnectionType.REST_API,
+                endpointUrl = "https://api.sstore.ng/api/gsecurity/api-access",
+                authType = AuthType.HMAC_SHA256,
+                permissions = setOf(
+                    IntegrationPermission.READ_VISITORS,
+                    IntegrationPermission.GRANT_ACCESS,
+                    IntegrationPermission.READ_ACCESS_EVENTS,
+                    IntegrationPermission.REPORT_INCIDENT,
+                    IntegrationPermission.READ_DEVICES
+                ),
+                totalRequestsHandled = 48920L,
+                totalEventsDispatched = 29310L,
+                averageLatencyMs = 21L
+            ),
             IntegrationConnectorConfig(
                 connectorId = "conn_rest_web",
                 name = "Estate Resident Web Portal API",

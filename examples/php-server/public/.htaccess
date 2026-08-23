@@ -1,0 +1,39 @@
+# =====================================================================
+# GUSH SECURITY PHP CONNECTOR — APACHE URL REWRITE CONFIGURATION
+# =====================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Ensure Authorization and Custom Headers are passed to PHP
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteRule .* - [E=HTTP_X_GUSH_TIMESTAMP:%{HTTP:X-Gush-Timestamp}]
+    RewriteRule .* - [E=HTTP_X_GUSH_REQUEST_ID:%{HTTP:X-Gush-Request-Id}]
+    RewriteRule .* - [E=HTTP_X_GUSH_SIGNATURE:%{HTTP:X-Gush-Signature}]
+    RewriteRule .* - [E=HTTP_X_ESTATE_ID:%{HTTP:X-Estate-Id}]
+    RewriteRule .* - [E=HTTP_IDEMPOTENCY_KEY:%{HTTP:Idempotency-Key}]
+
+    # Redirect Trailing Slashes If not a folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller (index.php)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Security Headers & File Protection
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Prevent viewing of sensitive files
+<FilesMatch "^\.env|composer\.(json|lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

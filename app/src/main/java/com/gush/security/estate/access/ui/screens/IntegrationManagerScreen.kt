@@ -29,8 +29,12 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoorSliding
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -315,7 +319,10 @@ fun IntegrationManagerScreen(
                 connectors = connectors,
                 onToggleConnector = { viewModel.toggleConnectorState(it) },
                 onTestConnector = { viewModel.testConnectorConnection(it) },
-                onAddConnectorClick = { showAddConnectorDialog = true }
+                onAddConnectorClick = { showAddConnectorDialog = true },
+                onEditEndpoint = { conn -> editingConnector = conn },
+                onRotateCredentials = { connId -> viewModel.rotateConnectorCredentials(connId) },
+                onDeleteConnector = { connId -> viewModel.deleteConnector(connId) }
             )
             1 -> HardwareDevicesTab(
                 devices = devices,
@@ -340,6 +347,19 @@ fun IntegrationManagerScreen(
             )
             5 -> ApiDocsTab()
         }
+    }
+
+    var editingConnector by remember { mutableStateOf<IntegrationConnectorConfig?>(null) }
+
+    if (editingConnector != null) {
+        EditEndpointDialog(
+            connector = editingConnector!!,
+            onDismiss = { editingConnector = null },
+            onSave = { connId, newUrl, reason ->
+                viewModel.updateConnectorEndpoint(connId, newUrl, reason)
+                editingConnector = null
+            }
+        )
     }
 
     if (showAddConnectorDialog) {
@@ -413,7 +433,10 @@ fun ConnectorsTab(
     connectors: List<IntegrationConnectorConfig>,
     onToggleConnector: (String) -> Unit,
     onTestConnector: (String) -> Unit,
-    onAddConnectorClick: () -> Unit
+    onAddConnectorClick: () -> Unit,
+    onEditEndpoint: (IntegrationConnectorConfig) -> Unit,
+    onRotateCredentials: (String) -> Unit,
+    onDeleteConnector: (String) -> Unit
 ) {
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -544,27 +567,49 @@ fun ConnectorsTab(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Bottom Action Bar: Safe Connection Test
+                    // Bottom Action Bar: Safe Connection Test, Edit URL, Rotate Keys, Delete
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Requests: ${conn.totalRequestsHandled} • Latency: ${conn.averageLatencyMs}ms",
+                            text = "Reqs: ${conn.totalRequestsHandled} • ${conn.averageLatencyMs}ms",
                             fontSize = 11.sp,
                             color = GushTextMuted
                         )
 
-                        OutlinedButton(
-                            onClick = { onTestConnector(conn.connectorId) },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, GushCobalt)
-                        ) {
-                            Icon(Icons.Default.Sensors, contentDescription = "Probe", tint = GushCobalt, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Test Connection", fontSize = 11.sp, color = GushCobalt, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { onEditEndpoint(conn) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1))
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = GushTextPrimary, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Edit URL", fontSize = 11.sp, color = GushTextPrimary)
+                            }
+
+                            OutlinedButton(
+                                onClick = { onRotateCredentials(conn.connectorId) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCBD5E1))
+                            ) {
+                                Icon(Icons.Default.Key, contentDescription = "Rotate", tint = GushTextSecondary, modifier = Modifier.size(13.dp))
+                            }
+
+                            OutlinedButton(
+                                onClick = { onTestConnector(conn.connectorId) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GushCobalt)
+                            ) {
+                                Icon(Icons.Default.Sensors, contentDescription = "Probe", tint = GushCobalt, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Test", fontSize = 11.sp, color = GushCobalt, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -1318,6 +1363,111 @@ fun AddDeviceDialog(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("Enroll")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// =========================================================================
+// EDIT CONNECTOR ENDPOINT & FAILOVER DIALOG
+// =========================================================================
+@Composable
+fun EditEndpointDialog(
+    connector: IntegrationConnectorConfig,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String) -> Unit
+) {
+    var endpointUrl by remember { mutableStateOf(connector.endpointUrl) }
+    var reason by remember { mutableStateOf("Upgraded to production cloud cluster") }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "Switch Endpoint URL",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GushTextPrimary
+                )
+                Text(
+                    text = "Connector: ${connector.name}",
+                    fontSize = 12.sp,
+                    color = GushTextSecondary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = endpointUrl,
+                    onValueChange = { endpointUrl = it },
+                    label = { Text("Gateway Endpoint URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            endpointUrl = "https://api.sstore.ng/api/gsecurity/api-access"
+                        }) {
+                            Icon(Icons.Default.Language, contentDescription = "Use Production Gateway", tint = GushCobalt)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Official Production Gateway:", fontSize = 11.sp, color = GushTextSecondary)
+                    OutlinedButton(
+                        onClick = { endpointUrl = "https://api.sstore.ng/api/gsecurity/api-access" },
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GushCobalt)
+                    ) {
+                        Text("Fill api.sstore.ng", fontSize = 10.sp, color = GushCobalt, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Audit Trail Reason") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(8.dp)) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (endpointUrl.isNotBlank()) {
+                                onSave(connector.connectorId, endpointUrl.trim(), reason.trim())
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GushCobalt),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Update Endpoint")
                     }
                 }
             }

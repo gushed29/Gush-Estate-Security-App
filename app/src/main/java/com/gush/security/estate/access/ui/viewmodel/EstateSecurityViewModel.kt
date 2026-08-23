@@ -935,6 +935,39 @@ class EstateSecurityViewModel(private val repository: EstateSecurityRepository) 
         _bannerMessage.value = "🔌 Registered new connector: $name"
     }
 
+    fun updateConnectorEndpoint(connectorId: String, newEndpointUrl: String, reason: String = "Admin update") {
+        val success = integrationHub.updateConnectorEndpoint(
+            connectorId = connectorId,
+            newEndpointUrl = newEndpointUrl,
+            actor = _activeGuard.value?.badgeId ?: _activeResident.value?.fullName ?: "ADMIN",
+            reason = reason
+        )
+        if (success) {
+            _integrationStatusMessage.value = "🌐 [Endpoint Updated] Switched to $newEndpointUrl"
+            _bannerMessage.value = "Updated connector endpoint URL"
+        }
+    }
+
+    fun rotateConnectorCredentials(connectorId: String) {
+        val newKey = integrationHub.rotateConnectorCredentials(
+            connectorId = connectorId,
+            actor = _activeGuard.value?.badgeId ?: _activeResident.value?.fullName ?: "ADMIN"
+        )
+        _integrationStatusMessage.value = "🔑 [Credentials Rotated] New key generated: ${newKey.take(14)}..."
+        _bannerMessage.value = "Rotated API key and HMAC secret"
+    }
+
+    fun deleteConnector(connectorId: String) {
+        val success = integrationHub.deleteConnector(
+            connectorId = connectorId,
+            actor = _activeGuard.value?.badgeId ?: _activeResident.value?.fullName ?: "ADMIN"
+        )
+        if (success) {
+            _integrationStatusMessage.value = "🗑️ [Connector Removed] Integration disconnected"
+            _bannerMessage.value = "Connector removed from Hub"
+        }
+    }
+
     fun registerNewDevice(
         name: String,
         deviceType: HardwareDeviceType,
