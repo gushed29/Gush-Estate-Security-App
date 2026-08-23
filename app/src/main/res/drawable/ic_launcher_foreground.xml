@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Shield Border -->
+    <path
+        android:pathData="M54,26 C64,26 76,22 80,20 C80,48 74,72 54,86 C34,72 28,48 28,20 C32,22 44,26 54,26 Z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#38BDF8">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="20"
+                android:endX="80"
+                android:endY="86"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#1E3A8A" />
+                <item android:offset="1.0" android:color="#0284C7" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Inner Gate Barrier & Lock Emblem -->
+    <path
+        android:pathData="M44,42 L64,42 C67,42 69,44 69,47 L69,63 C69,66 67,68 64,68 L44,68 C41,68 39,66 39,63 L39,47 C39,44 41,42 44,42 Z"
+        android:fillColor="#0F172A"
+        android:strokeWidth="1.5"
+        android:strokeColor="#38BDF8" />
+    <!-- Gate Bars -->
+    <path
+        android:pathData="M44,48 L44,62 M49,48 L49,62 M54,48 L54,62 M59,48 L59,62 M64,48 L64,62"
+        android:strokeWidth="1.5"
+        android:strokeColor="#38BDF8" />
+    <!-- Emerald Check/Key Badge -->
+    <path
+        android:pathData="M54,34 C50,34 47,37 47,41 L50,41 C50,38.8 51.8,37 54,37 C56.2,37 58,38.8 58,41 L61,41 C61,37 58,34 54,34 Z"
+        android:fillColor="#10B981" />
+    <path
+        android:pathData="M54,52 L54,58"
+        android:strokeWidth="2"
+        android:strokeColor="#10B981" />
+</vector>
