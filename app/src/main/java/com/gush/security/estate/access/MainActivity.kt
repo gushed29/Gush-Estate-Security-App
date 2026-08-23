@@ -168,6 +168,7 @@ fun EstateSecurityApp(viewModel: EstateSecurityViewModel) {
                         meetings = meetings,
                         complaints = complaints,
                         messages = messages,
+                        viewModel = viewModel,
                         onTogglePolicy = { key, isEnabled ->
                             viewModel.togglePolicy(key, isEnabled)
                         },

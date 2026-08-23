@@ -26,6 +26,21 @@ import com.gush.security.estate.access.data.repository.ActiveCallSession
 import com.gush.security.estate.access.data.repository.CallState
 import com.gush.security.estate.access.data.repository.EstateSecurityRepository
 import com.gush.security.estate.access.data.repository.VerificationResult
+import com.gush.security.estate.access.integration.adapters.DeviceOperationResult
+import com.gush.security.estate.access.integration.connectors.AutomationPlatform
+import com.gush.security.estate.access.integration.connectors.AutomationRule
+import com.gush.security.estate.access.integration.connectors.BridgeSyncResult
+import com.gush.security.estate.access.integration.connectors.BridgeTestResult
+import com.gush.security.estate.access.integration.connectors.DatabaseBridgeSpec
+import com.gush.security.estate.access.integration.gateway.GushSecurityIntegrationHub
+import com.gush.security.estate.access.integration.model.AuthType
+import com.gush.security.estate.access.integration.model.ConnectionType
+import com.gush.security.estate.access.integration.model.GushSecurityCommand
+import com.gush.security.estate.access.integration.model.GushSecurityEvent
+import com.gush.security.estate.access.integration.model.HardwareDeviceProfile
+import com.gush.security.estate.access.integration.model.HardwareDeviceType
+import com.gush.security.estate.access.integration.model.IntegrationConnectorConfig
+import com.gush.security.estate.access.integration.model.IntegrationPermission
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -814,6 +829,124 @@ class EstateSecurityViewModel(private val repository: EstateSecurityRepository) 
             repository.deleteGuardAccount(guard)
             _bannerMessage.value = "🗑️ Removed guard profile for ${guard.fullName}"
         }
+    }
+
+    // =========================================================================
+    // GUSH CONNECT — UNIVERSAL ACCESS CONTROL INTEGRATION GATEWAY & HUB
+    // =========================================================================
+    val integrationHub = GushSecurityIntegrationHub()
+    val integrationConnectors: StateFlow<List<IntegrationConnectorConfig>> = integrationHub.connectors
+    val registeredDevices: StateFlow<List<HardwareDeviceProfile>> = integrationHub.devices
+    val databaseBridges: StateFlow<List<DatabaseBridgeSpec>> = integrationHub.dbBridges
+    val automationRules: StateFlow<List<AutomationRule>> = integrationHub.automationRules
+    val liveIntegrationEvents: StateFlow<List<GushSecurityEvent>> = integrationHub.eventBus.recentEvents
+    val commandExecutionLog: StateFlow<List<GushSecurityCommand>> = integrationHub.commandBus.recentCommands
+
+    private val _integrationStatusMessage = MutableStateFlow<String?>(null)
+    val integrationStatusMessage: StateFlow<String?> = _integrationStatusMessage.asStateFlow()
+
+    fun dismissIntegrationStatus() {
+        _integrationStatusMessage.value = null
+    }
+
+    fun toggleConnectorState(connectorId: String) {
+        integrationHub.toggleConnector(connectorId)
+    }
+
+    fun testConnectorConnection(connectorId: String) {
+        viewModelScope.launch {
+            val probeResult = integrationHub.testConnectorConnection(connectorId)
+            _integrationStatusMessage.value = "🔍 Connector Probe: $probeResult"
+            _bannerMessage.value = "⚡ Connector verified successfully"
+        }
+    }
+
+    fun testDeviceConnection(deviceId: String) {
+        viewModelScope.launch {
+            val result = integrationHub.testDevice(deviceId)
+            _integrationStatusMessage.value = if (result.isSuccess) {
+                "✅ [Device Probe OK] ${result.message} (${result.responseTimeMs}ms)"
+            } else {
+                "⚠️ [Device Offline/Error] ${result.message}"
+            }
+            _bannerMessage.value = if (result.isSuccess) "📡 Hardware device online" else "⚠️ Device unreachable"
+        }
+    }
+
+    fun executeRemoteHardwareCommand(
+        commandType: String,
+        targetDeviceId: String,
+        targetGateName: String,
+        parameters: Map<String, String> = emptyMap()
+    ) {
+        viewModelScope.launch {
+            val result = integrationHub.executeCommand(
+                commandType = commandType,
+                targetDeviceId = targetDeviceId,
+                targetGateName = targetGateName,
+                actorId = _activeGuard.value?.badgeId ?: _activeResident.value?.fullName ?: "ADMIN_OP",
+                actorRole = if (_activeGuard.value != null) "GUARD_OFFICER" else "ADMIN_SUPERVISOR",
+                parameters = parameters
+            )
+            _integrationStatusMessage.value = if (result.isSuccess) {
+                "⚡ [Command Executed] ${result.message} (${result.responseTimeMs}ms)"
+            } else {
+                "🛑 [Command Rejected] ${result.message}"
+            }
+            _bannerMessage.value = if (result.isSuccess) "Gate barrier actuated" else "Command rejected by Security Policy"
+        }
+    }
+
+    fun testDatabaseBridge(spec: DatabaseBridgeSpec) {
+        viewModelScope.launch {
+            val result = integrationHub.dbBridgeService.testBridgeConnection(spec)
+            _integrationStatusMessage.value = if (result.isSuccess) {
+                "🗄️ [DB Bridge OK] ${result.message} (${result.latencyMs}ms)"
+            } else {
+                "🛑 [DB Bridge Failed] Unable to connect to ${spec.hostAddress}"
+            }
+        }
+    }
+
+    fun triggerDatabaseSync(spec: DatabaseBridgeSpec) {
+        viewModelScope.launch {
+            val sync = integrationHub.dbBridgeService.triggerManualSync(spec)
+            _integrationStatusMessage.value = "🔄 [DB Synced] Ingested: ${sync.recordsIngested}, Exported: ${sync.recordsExported} (${sync.durationMs}ms)"
+            _bannerMessage.value = "Synced ${sync.recordsIngested} passes from external DB"
+        }
+    }
+
+    fun testAutomationRule(rule: AutomationRule) {
+        viewModelScope.launch {
+            val result = integrationHub.automationService.testAutomationRule(rule)
+            _integrationStatusMessage.value = "⚡ [Automation Webhook] ${result.message}"
+            _bannerMessage.value = "Dispatched test trigger to ${rule.platform.platformName}"
+        }
+    }
+
+    fun registerNewConnector(
+        name: String,
+        connectionType: ConnectionType,
+        endpointUrl: String,
+        authType: AuthType,
+        permissions: Set<IntegrationPermission>
+    ) {
+        integrationHub.addConnector(name, connectionType, endpointUrl, authType, permissions)
+        _bannerMessage.value = "🔌 Registered new connector: $name"
+    }
+
+    fun registerNewDevice(
+        name: String,
+        deviceType: HardwareDeviceType,
+        manufacturer: String,
+        modelNumber: String,
+        ipAddress: String,
+        port: Int,
+        location: String,
+        assignedGateName: String
+    ) {
+        integrationHub.addDevice(name, deviceType, manufacturer, modelNumber, ipAddress, port, location, assignedGateName)
+        _bannerMessage.value = "🛰️ Enrolled hardware device: $name"
     }
 }
 

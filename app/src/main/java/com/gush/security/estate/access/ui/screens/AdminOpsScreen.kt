@@ -108,8 +108,10 @@ import com.gush.security.estate.access.ui.theme.GushedTextSecondary
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.SupportAgent
+import com.gush.security.estate.access.ui.viewmodel.EstateSecurityViewModel
 
 @Composable
 fun AdminOpsScreen(
@@ -126,6 +128,7 @@ fun AdminOpsScreen(
     meetings: List<EstateMeetingEntity>,
     complaints: List<ResidentComplaintEntity>,
     messages: List<EstateMessageEntity>,
+    viewModel: EstateSecurityViewModel? = null,
     onTogglePolicy: (key: String, isEnabled: Boolean) -> Unit,
     onResolveIncident: (incident: IncidentEntity, notes: String) -> Unit,
     onOpenIncidentDialog: () -> Unit,
@@ -200,6 +203,7 @@ fun AdminOpsScreen(
         )
         val tabItems = listOf(
             AdminTabItem("OVERVIEW", "Live Feed", Icons.Default.Timeline),
+            AdminTabItem("INTEGRATION_HUB", "Gush Connect", Icons.Default.Hub),
             AdminTabItem("GATES", "Gates (${securityGates.size})", Icons.Default.DoorSliding),
             AdminTabItem("RESIDENTS", "Residents (${residents.size})", Icons.Default.Home),
             AdminTabItem("GUARDS", "Guards (${guards.size})", Icons.Default.Security),
@@ -258,6 +262,18 @@ fun AdminOpsScreen(
 
         // Main Content Area based on Tab
         when (adminSubTab) {
+            "INTEGRATION_HUB" -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    if (viewModel != null) {
+                        IntegrationManagerScreen(viewModel = viewModel)
+                    }
+                }
+            }
+
             "OVERVIEW" -> {
                 LazyColumn(
                     modifier = Modifier

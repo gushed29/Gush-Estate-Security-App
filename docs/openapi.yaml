@@ -1,0 +1,117 @@
+openapi: 3.0.3
+info:
+  title: Gush Security — Universal Access Control Integration API
+  description: Official OpenAPI 3.0 specification for Gush Security Hub & Gush Connect Integration Gateway.
+  version: 1.0.0
+servers:
+  - url: https://api.gushsecurity.com/api/v1
+    description: Production Cloud Gateway
+  - url: https://lan.gushsecurity.local:8443/api/v1
+    description: Estate Local LAN Hub Gateway
+paths:
+  /access/verify:
+    post:
+      summary: Verify Visitor Pass or PIN Code
+      operationId: verifyAccessPass
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                passcode:
+                  type: string
+                  example: "849201"
+                qr_token:
+                  type: string
+                  example: "GSH-9482-1049-8392"
+                gate_code:
+                  type: string
+                  example: "PBE-GT01"
+                device_id:
+                  type: string
+                  example: "dev_scanner_gate1"
+      responses:
+        '200':
+          description: Access verification decision
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [APPROVED, DENIED, EXPIRED, REVOKED]
+                  visitor_name:
+                    type: string
+                  property_unit:
+                    type: string
+  /visitor/passes:
+    post:
+      summary: Create Visitor Access Pass
+      operationId: createVisitorPass
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visitor_name, property_unit, pass_type]
+              properties:
+                visitor_name:
+                  type: string
+                visitor_phone:
+                  type: string
+                property_unit:
+                  type: string
+                pass_type:
+                  type: string
+                  enum: [GUEST, DELIVERY, CONTRACTOR, DOMESTIC_STAFF, EMERGENCY]
+      responses:
+        '201':
+          description: Created visitor pass
+  /devices/{id}/command:
+    post:
+      summary: Execute Hardware Command (Gate, Lock, Relay)
+      operationId: executeDeviceCommand
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command_type]
+              properties:
+                command_type:
+                  type: string
+                  enum: [OPEN_GATE, CLOSE_GATE, UNLOCK_DOOR, LOCK_DOOR, PULSE_RELAY]
+                parameters:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        '200':
+          description: Command execution result
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
