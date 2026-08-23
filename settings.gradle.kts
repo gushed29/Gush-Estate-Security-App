@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Gushed Security"
+rootProject.name = "Gush Security"
 
 include(":app")

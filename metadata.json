@@ -1,6 +1,6 @@
 {
-  "name": "Gushed Security",
-  "description": "Open Estate Access Control, Gate Verification, Resident Passes, and Property Evidence Platform by Gushed Systems.",
+  "name": "Gush Security",
+  "description": "Enterprise Estate Access Control, Visitor Management, Security Operations, and Property Evidence Platform.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
