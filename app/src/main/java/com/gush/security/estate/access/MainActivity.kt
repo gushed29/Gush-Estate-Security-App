@@ -149,6 +149,7 @@ fun EstateSecurityApp(viewModel: EstateSecurityViewModel) {
                         residents = residents,
                         guards = guards,
                         gates = securityGates,
+                        viewModel = viewModel,
                         onLoginAdmin = { viewModel.loginAsAdmin() },
                         onLoginResident = { resident -> viewModel.loginAsResident(resident) },
                         onLoginGuard = { guard, gateName -> viewModel.loginAsGuard(guard, gateName) }

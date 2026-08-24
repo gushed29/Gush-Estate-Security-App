@@ -43,6 +43,13 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -111,6 +118,14 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.window.DialogProperties
+import com.gush.security.estate.access.security.AccessInvitationCode
+import com.gush.security.estate.access.security.EstateProfile
+import com.gush.security.estate.access.security.RegisteredDeviceItem
+import com.gush.security.estate.access.ui.theme.GushedEmeraldDark
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.gush.security.estate.access.ui.viewmodel.EstateSecurityViewModel
 
 @Composable
@@ -151,6 +166,7 @@ fun AdminOpsScreen(
     onStartCall: (String, String, String, Boolean, String) -> Unit
 ) {
     var adminSubTab by remember { mutableStateOf("OVERVIEW") }
+    var showCreateAccessCodeDialog by remember { mutableStateOf(false) }
     var showAddGateDialog by remember { mutableStateOf(false) }
     var showAddResidentDialog by remember { mutableStateOf(false) }
     var showAddGuardDialog by remember { mutableStateOf(false) }
@@ -203,6 +219,7 @@ fun AdminOpsScreen(
         )
         val tabItems = listOf(
             AdminTabItem("OVERVIEW", "Live Feed", Icons.Default.Timeline),
+            AdminTabItem("ACCESS_CODES", "Access Codes & Devices", Icons.Default.Key),
             AdminTabItem("INTEGRATION_HUB", "Gush Connect", Icons.Default.Hub),
             AdminTabItem("GATES", "Gates (${securityGates.size})", Icons.Default.DoorSliding),
             AdminTabItem("RESIDENTS", "Residents (${residents.size})", Icons.Default.Home),
@@ -262,6 +279,13 @@ fun AdminOpsScreen(
 
         // Main Content Area based on Tab
         when (adminSubTab) {
+            "ACCESS_CODES" -> {
+                AccessCodesManagementSection(
+                    viewModel = viewModel,
+                    onOpenCreateCodeDialog = { showCreateAccessCodeDialog = true }
+                )
+            }
+
             "INTEGRATION_HUB" -> {
                 Box(
                     modifier = Modifier
@@ -1150,6 +1174,17 @@ fun AdminOpsScreen(
         }
     }
 
+    // --- Modal: Create Join / Access Code ---
+    if (showCreateAccessCodeDialog && viewModel != null) {
+        CreateAccessCodeDialog(
+            onDismiss = { showCreateAccessCodeDialog = false },
+            onGenerate = { role, name, phone, unitOrGate, category ->
+                viewModel.generateJoinInvitation(role, name, phone, unitOrGate, category)
+                showCreateAccessCodeDialog = false
+            }
+        )
+    }
+
     // --- Modal: Add Security Gate ---
     if (showAddGateDialog) {
         AddGateDialog(
@@ -1692,3 +1727,451 @@ private fun EmptyPlaceholder(text: String) {
         Text(text = text, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = GushedTextSecondary)
     }
 }
+
+@Composable
+fun AccessCodesManagementSection(
+    viewModel: EstateSecurityViewModel?,
+    onOpenCreateCodeDialog: () -> Unit
+) {
+    val invitationCodes by (viewModel?.invitationCodes ?: MutableStateFlow(emptyList<AccessInvitationCode>())).collectAsState()
+    val registeredDevices by (viewModel?.enrolledMobileDevices ?: MutableStateFlow(emptyList<RegisteredDeviceItem>())).collectAsState()
+    val activeEstate by (viewModel?.activeEstate ?: MutableStateFlow(EstateProfile())).collectAsState()
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    var subFilter by remember { mutableStateOf("CODES") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Estate Infrastructure Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+            shape = RoundedCornerShape(20.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "ESTATE IDENTITY & SUBSCRIPTION",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = GushedTextMuted,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = activeEstate.name,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        color = GushedTextPrimary
+                    )
+                    Text(
+                        text = "ID: ${activeEstate.estateId} • Tier: ${activeEstate.tier}",
+                        fontSize = 11.sp,
+                        color = GushedCobalt,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(GushedEmeraldDark.copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "✓ ${activeEstate.subscriptionStatus}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GushedEmeraldDark
+                    )
+                }
+            }
+        }
+
+        // Sub-filter tabs & Generate Button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(
+                    selected = subFilter == "CODES",
+                    onClick = { subFilter = "CODES" },
+                    label = { Text("Access Codes (${invitationCodes.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = GushedCobalt,
+                        selectedLabelColor = Color.White
+                    )
+                )
+                FilterChip(
+                    selected = subFilter == "DEVICES",
+                    onClick = { subFilter = "DEVICES" },
+                    label = { Text("Enrolled Devices (${registeredDevices.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = GushedCobalt,
+                        selectedLabelColor = Color.White
+                    )
+                )
+            }
+
+            if (subFilter == "CODES") {
+                Button(
+                    onClick = onOpenCreateCodeDialog,
+                    colors = ButtonDefaults.buttonColors(containerColor = GushedCobalt),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("New Code", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (subFilter == "CODES") {
+                if (invitationCodes.isEmpty()) {
+                    item { EmptyPlaceholder("No invitation access codes generated yet.") }
+                }
+                items(invitationCodes) { codeItem ->
+                    val isActive = codeItem.status == "ACTIVE"
+                    val (roleBadgeBg, roleBadgeColor) = when (codeItem.role) {
+                        "ADMIN" -> Pair(Color(0xFFEDE9FE), Color(0xFF6D28D9))
+                        "SECURITY" -> Pair(Color(0xFFECFDF5), GushedEmeraldDark)
+                        else -> Pair(Color(0xFFFEF3C7), Color(0xFFB45309))
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) Color.White else Color(0xFFFECACA)),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(roleBadgeBg)
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = codeItem.role,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = roleBadgeColor
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = codeItem.targetName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GushedTextPrimary
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isActive) Color(0xFFECFDF5) else Color(0xFFFEE2E2))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = codeItem.status,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isActive) GushedEmeraldDark else GushedCrimsonDenied
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Access Code Bar
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(GushedCobalt.copy(alpha = 0.05f))
+                                    .border(1.dp, GushedCobalt.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Key, contentDescription = null, tint = GushedCobalt, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = codeItem.code,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = GushedCobalt,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(codeItem.code))
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = GushedCobalt, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Unit/Gate: ${codeItem.unitOrGate} • Tel: ${codeItem.targetPhone}",
+                                    fontSize = 10.sp,
+                                    color = GushedTextMuted
+                                )
+
+                                if (isActive) {
+                                    Text(
+                                        text = "Revoke Code",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GushedCrimsonDenied,
+                                        modifier = Modifier.clickable {
+                                            viewModel?.revokeJoinInvitation(codeItem.code)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (registeredDevices.isEmpty()) {
+                    item { EmptyPlaceholder("No registered hardware devices detected.") }
+                }
+                items(registeredDevices) { device ->
+                    val isActive = device.status == "ACTIVE"
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isActive) Color.White else Color(0xFFFECACA)),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(GushedCobalt.copy(alpha = 0.08f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = GushedCobalt, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = device.deviceModel,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GushedTextPrimary
+                                    )
+                                    Text(
+                                        text = "${device.assignedTo} • ${device.deviceId}",
+                                        fontSize = 11.sp,
+                                        color = GushedTextSecondary
+                                    )
+                                }
+                            }
+
+                            if (isActive) {
+                                Button(
+                                    onClick = { viewModel?.revokeDevice(device.deviceId) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFEE2E2)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Text("Revoke", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GushedCrimsonDenied)
+                                }
+                            } else {
+                                Text("REVOKED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GushedCrimsonDenied)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CreateAccessCodeDialog(
+    onDismiss: () -> Unit,
+    onGenerate: (role: String, name: String, phone: String, unitOrGate: String, category: String) -> Unit
+) {
+    var selectedRole by remember { mutableStateOf("RESIDENT") }
+    var targetName by remember { mutableStateOf("") }
+    var targetPhone by remember { mutableStateOf("") }
+    var unitOrGate by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("RESIDENT") }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .imePadding()
+                .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            shadowElevation = 16.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Generate Access Code",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        color = GushedTextPrimary
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = GushedTextMuted)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "AUTHORIZATION ROLE",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = GushedTextMuted,
+                    letterSpacing = 0.5.sp
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf("RESIDENT", "SECURITY", "ADMIN").forEach { role ->
+                        val isSelected = selectedRole == role
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                selectedRole = role
+                                if (role == "SECURITY") unitOrGate = "Gate 1 - Main Gate"
+                            },
+                            label = { Text(role, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GushedCobalt,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = targetName,
+                    onValueChange = { targetName = it },
+                    label = { Text("Assignee Full Name") },
+                    placeholder = { Text("e.g. Chief Babatunde / Officer John") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = targetPhone,
+                    onValueChange = { targetPhone = it },
+                    label = { Text("Assignee Phone Number") },
+                    placeholder = { Text("+234 800 000 0000") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = unitOrGate,
+                    onValueChange = { unitOrGate = it },
+                    label = { Text(if (selectedRole == "SECURITY") "Assigned Gate Post" else "House / Unit Number") },
+                    placeholder = { Text(if (selectedRole == "SECURITY") "e.g. Gate 2 - West Wing" else "e.g. House 18, Palm Avenue") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Button(
+                    onClick = {
+                        if (targetName.isNotBlank()) {
+                            onGenerate(selectedRole, targetName, targetPhone, unitOrGate, category)
+                        }
+                    },
+                    enabled = targetName.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GushedCobalt),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Generate Cryptographic Join Code", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
