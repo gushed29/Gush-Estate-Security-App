@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.gush.security.estate.access.data.local.entities.DeclaredItemEntity
 import com.gush.security.estate.access.data.local.entities.VisitorPassEntity
 import com.gush.security.estate.access.ui.theme.GushedAmberDark
@@ -98,10 +100,14 @@ fun ItemInspectionDialog(
         it.exitInspectionStatus == "ADDED" || it.exitInspectionStatus == "MISSING" || it.exitInspectionStatus == "UNDECLARED"
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.96f)
+                .imePadding()
                 .padding(vertical = 16.dp),
             shape = RoundedCornerShape(16.dp),
             color = GushedSurfaceDark,

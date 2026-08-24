@@ -140,13 +140,13 @@ class GushSecurityIntegrationHub {
         _connectors.value = _connectors.value.map {
             if (it.connectorId == connectorId) it.copy(endpointUrl = newEndpointUrl) else it
         }
-        eventBus.publishEvent(
+        eventBus.publishEventSync(
             GushSecurityEvent(
                 eventType = "connector.endpoint_switched",
-                estateId = "pinnock_estate_01",
+                source = "gush.gateway.admin",
                 actorId = actor,
                 actorRole = "ADMIN_SUPERVISOR",
-                description = "Switched endpoint for [${current.name}] from $oldUrl to $newEndpointUrl. Reason: $reason",
+                tenantId = "pinnock_estate_01",
                 payload = mapOf(
                     "connector_id" to connectorId,
                     "old_url" to oldUrl,
@@ -163,22 +163,28 @@ class GushSecurityIntegrationHub {
      */
     fun rotateConnectorCredentials(connectorId: String, actor: String = "ADMIN"): String {
         val current = _connectors.value.find { it.connectorId == connectorId } ?: return "Connector not found"
-        val newKey = "gush_live_" + UUID.randomUUID().toString().replace("-", "").take(24)
-        val newSecret = "sec_" + UUID.randomUUID().toString().replace("-", "")
+        val newKeyMasked = "gsk_live_****" + (1000..9999).random()
+        val newSecretMasked = "whsec_****" + (1000..9999).random()
         _connectors.value = _connectors.value.map {
-            if (it.connectorId == connectorId) it.copy(apiKey = newKey, apiSecret = newSecret) else it
+            if (it.connectorId == connectorId) it.copy(
+                apiKeyMasked = newKeyMasked,
+                webhookSecretMasked = newSecretMasked
+            ) else it
         }
-        eventBus.publishEvent(
+        eventBus.publishEventSync(
             GushSecurityEvent(
                 eventType = "connector.credentials_rotated",
-                estateId = "pinnock_estate_01",
+                source = "gush.gateway.admin",
                 actorId = actor,
                 actorRole = "ADMIN_SUPERVISOR",
-                description = "Rotated API key & HMAC secret for [${current.name}].",
-                payload = mapOf("connector_id" to connectorId, "key_prefix" to newKey.take(12) + "...")
+                tenantId = "pinnock_estate_01",
+                payload = mapOf(
+                    "connector_id" to connectorId,
+                    "key_prefix" to newKeyMasked
+                )
             )
         )
-        return newKey
+        return newKeyMasked
     }
 
     /**
@@ -187,14 +193,17 @@ class GushSecurityIntegrationHub {
     fun deleteConnector(connectorId: String, actor: String = "ADMIN"): Boolean {
         val current = _connectors.value.find { it.connectorId == connectorId } ?: return false
         _connectors.value = _connectors.value.filter { it.connectorId != connectorId }
-        eventBus.publishEvent(
+        eventBus.publishEventSync(
             GushSecurityEvent(
                 eventType = "connector.deleted",
-                estateId = "pinnock_estate_01",
+                source = "gush.gateway.admin",
                 actorId = actor,
                 actorRole = "ADMIN_SUPERVISOR",
-                description = "Removed connector [${current.name}] ($connectorId).",
-                payload = mapOf("connector_id" to connectorId, "name" to current.name)
+                tenantId = "pinnock_estate_01",
+                payload = mapOf(
+                    "connector_id" to connectorId,
+                    "name" to current.name
+                )
             )
         )
         return true

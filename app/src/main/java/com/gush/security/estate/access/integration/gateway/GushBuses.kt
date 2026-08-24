@@ -35,6 +35,12 @@ class GushEventBus {
         _eventsFlow.emit(event)
     }
 
+    fun publishEventSync(event: GushSecurityEvent) {
+        val updated = (_recentEvents.value + event).takeLast(100)
+        _recentEvents.value = updated
+        _eventsFlow.tryEmit(event)
+    }
+
     fun getDeadLetterQueue(): List<GushSecurityEvent> = deadLetterQueue.toList()
 
     fun moveToDeadLetter(event: GushSecurityEvent) {

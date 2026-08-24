@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -84,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.gush.security.estate.access.integration.connectors.AutomationPlatform
 import com.gush.security.estate.access.integration.connectors.AutomationRule
 import com.gush.security.estate.access.integration.connectors.DatabaseBridgeSpec
@@ -132,6 +134,7 @@ fun IntegrationManagerScreen(
 
     var showAddConnectorDialog by remember { mutableStateOf(false) }
     var showAddDeviceDialog by remember { mutableStateOf(false) }
+    var editingConnector by remember { mutableStateOf<IntegrationConnectorConfig?>(null) }
 
     Column(
         modifier = modifier
@@ -348,8 +351,6 @@ fun IntegrationManagerScreen(
             5 -> ApiDocsTab()
         }
     }
-
-    var editingConnector by remember { mutableStateOf<IntegrationConnectorConfig?>(null) }
 
     if (editingConnector != null) {
         EditEndpointDialog(
@@ -1223,11 +1224,16 @@ fun AddConnectorDialog(
     var selectedType by remember { mutableStateOf(ConnectionType.REST_API) }
     var selectedAuth by remember { mutableStateOf(AuthType.API_KEY) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .imePadding()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -1304,11 +1310,16 @@ fun AddDeviceDialog(
     var location by remember { mutableStateOf("North Gate Barrier") }
     var assignedGate by remember { mutableStateOf("Gate 1 - Pinnock Beach Estate Main Gate") }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .imePadding()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -1382,11 +1393,16 @@ fun EditEndpointDialog(
     var endpointUrl by remember { mutableStateOf(connector.endpointUrl) }
     var reason by remember { mutableStateOf("Upgraded to production cloud cluster") }
 
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .imePadding()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
